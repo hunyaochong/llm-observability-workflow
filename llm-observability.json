@@ -1,0 +1,577 @@
+{
+  "name": "Track LLM tokens",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Welcome to Troopers!\n\nSo glad you’re here! 😊 Are you already a Troopers client, or just getting started?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        704,
+        -256
+      ],
+      "id": "759d272c-634e-450e-9ff7-8d2ad0d15bf2",
+      "name": "When chat message received",
+      "webhookId": "5e11697c-dfc4-457e-b535-43f65ba8da81"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{  $('When chat message received').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=You are a helpful assistant",
+          "returnIntermediateSteps": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        -256
+      ],
+      "id": "5da4ef43-0d4d-4f7b-8180-ce7913ba4021",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "code": {
+          "supplyData": {
+            "code": "const { ChatOpenAI } = require(\"@langchain/openai\");\n\n// 1. Configure as required.\n// - costs are per million tokens and depends on the model.\nconst openAIApiKey = process.env.OPENAI_API_KEY;\nconst model = \"gpt-5-mini-2025-08-07\";\nconst input_token_cost = 0.25;\nconst output_token_cost = 2.00;\n\n// 2. Customize LLM token tracker\nconst tools = await this.getInputConnectionData('ai_tool', 0);\nconst googleSheetTool = tools[0];\n\nconst {\n  workflow_id,\n  execution_id,\n  client_id } = $('Set metadata').first().json;\n\nconst llm = new ChatOpenAI({\n  apiKey: openAIApiKey,\n  model,\n  callbacks: [\n    {\n      handleLLMEnd: async function(output,runId,parentId) {\n        const generation = output.generations[0][0];\n        const message = generation.message;\n        const row = {\n          date: (new Date()).toGMTString(),\n          workflow_id,\n          execution_id,\n          client_id,\n          model,\n          input_tokens: message.usage_metadata.input_tokens,\n          output_tokens: message.usage_metadata.output_tokens,\n          total_tokens: message.usage_metadata.total_tokens,\n          input_cost: (message.usage_metadata.input_tokens / 1_000_000) * input_token_cost,\n          output_cost: (message.usage_metadata.output_tokens / 1_000_000) * output_token_cost,\n        };\n        row.total_cost = row.input_cost + row.output_cost;\n        await googleSheetTool.func(row);\n      }\n    }\n  ]\n});\n\nreturn llm;"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "ai_tool",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "ai_languageModel"
+            }
+          ]
+        }
+      },
+      "id": "3ec71214-37f0-4636-b448-fb27a76502b1",
+      "name": "GPT-5.1-mini",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "position": [
+        1136,
+        -32
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1O4PVOD584KWLzzj8gEym95hs8z3-Y4UjImMwKfby98c/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Token cost tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1O4PVOD584KWLzzj8gEym95hs8z3-Y4UjImMwKfby98c/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "date": "={{ $fromAI(\"date\") }}",
+            "llm_node": "={{ $fromAI(\"llm_node\") }}",
+            "model": "={{ $fromAI(\"model\") }}",
+            "workflow_id": "={{ $fromAI(\"workflow_id\") }}",
+            "execution_id": "={{ $fromAI(\"execution_id\") }}",
+            "client_id": "={{ $fromAI(\"client_id\") }}",
+            "input_tokens": "={{ $fromAI(\"input_tokens\") }}",
+            "input_token_cost ($ / million)": "={{ $fromAI(\"input_token_cost\") }}",
+            "output_tokens": "={{ $fromAI(\"output_tokens\") }}",
+            "output_token_cost ($ / million)": "={{ $fromAI(\"output_token_cost\") }}",
+            "total_tokens": "={{ $fromAI(\"total_tokens\") }}",
+            "input_cost": "={{ $fromAI(\"input_cost\") }}",
+            "output_cost": "={{ $fromAI(\"output_cost\") }}",
+            "total_cost": "={{ $fromAI(\"total_cost\") }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "llm_node",
+              "displayName": "llm_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "model",
+              "displayName": "model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "client_id",
+              "displayName": "client_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "input_tokens",
+              "displayName": "input_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "input_token_cost ($ / million)",
+              "displayName": "input_token_cost ($ / million)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "output_tokens",
+              "displayName": "output_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "output_token_cost ($ / million)",
+              "displayName": "output_token_cost ($ / million)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "total_tokens",
+              "displayName": "total_tokens",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "input_cost",
+              "displayName": "input_cost",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "output_cost",
+              "displayName": "output_cost",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "total_cost",
+              "displayName": "total_cost",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "575e6523-8fe0-4b8a-bbab-b33c76537ec1",
+      "name": "Token Usage Log",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "position": [
+        1264,
+        176
+      ],
+      "typeVersion": 4.5,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wOT0EGRAXG51Ihtb",
+          "name": "Google Sheets account (Augra)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "messages": {
+          "message": [
+            {
+              "content": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('message0_Text', ``, 'string') }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.perplexityTool",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        -32
+      ],
+      "id": "fb4ac821-531a-4c81-bc28-87457674e549",
+      "name": "Message a model in Perplexity",
+      "credentials": {
+        "perplexityApi": {
+          "id": "84cqFk8cVWpxvRkY",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1O4PVOD584KWLzzj8gEym95hs8z3-Y4UjImMwKfby98c",
+          "mode": "list",
+          "cachedResultName": "Track LLM Tokens",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1O4PVOD584KWLzzj8gEym95hs8z3-Y4UjImMwKfby98c/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 94625050,
+          "mode": "list",
+          "cachedResultName": "Observability",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1O4PVOD584KWLzzj8gEym95hs8z3-Y4UjImMwKfby98c/edit#gid=94625050"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $now }}",
+            "workflow_id": "={{ $('Set metadata').item.json.workflow_id }}",
+            "execution_id": "={{ $('Set metadata').item.json.execution_id }}",
+            "client_id": "={{ $('Set metadata').item.json.client_id }}",
+            "output": "={{ $json.output }}",
+            "input": "={{ $('When chat message received').item.json.chatInput }}",
+            "Tool use": "={{ $json.intermediateSteps[0].action.tool }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "client_id",
+              "displayName": "client_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tool use",
+              "displayName": "Tool use",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1904,
+        -240
+      ],
+      "id": "79983fa9-cc53-42b8-ad1f-43ab6df48588",
+      "name": "Log actions",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wOT0EGRAXG51Ihtb",
+          "name": "Google Sheets account (Augra)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ca1744cf-69e7-4a85-81d3-2fb2b936e496",
+              "name": "workflow_id",
+              "value": "={{ $workflow.id }}",
+              "type": "string"
+            },
+            {
+              "id": "205c7c4d-2dfa-471f-9306-33d30e16722a",
+              "name": "execution_id",
+              "value": "={{ $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "3fa4932f-c3cc-41a8-90a4-d1b3a2d32cdd",
+              "name": "client_id",
+              "value": "123",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        -256
+      ],
+      "id": "061d37b0-7f57-4f7c-b3a0-7b034dbdfaaf",
+      "name": "Set metadata"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9c8947e8-fa44-4e3e-b869-9284afc03a61",
+              "leftValue": "={{ $json.intermediateSteps }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1648,
+        -256
+      ],
+      "id": "c7f868cc-3313-4d4a-b376-f581d851f899",
+      "name": "If no action used"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Set metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-5.1-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Usage Log": {
+      "ai_tool": [
+        [
+          {
+            "node": "GPT-5.1-mini",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model in Perplexity": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "If no action used",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set metadata": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If no action used": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Log actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "65c9d6b0-92f2-4e08-a349-6cb48319eb37",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36fee986cc83112881fb12ec7cc2d0221d7bddd71c11715c196899b114e8b0d2"
+  },
+  "id": "QjdKkn0jWe67kcZz",
+  "tags": []
+}
